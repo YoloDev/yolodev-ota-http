@@ -1,4 +1,5 @@
 #include "mgos_yolodev_ota_http.h"
+#include "common/cs_crc32.h"
 #include "common/cs_dbg.h"
 #include "mgos_event.h"
 #include "mgos_mongoose.h"
@@ -44,6 +45,8 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
     case MG_EV_HTTP_CHUNK: {
       struct http_message *msg = (struct http_message *)ev_data;
       cn->flags |= MG_F_DELETE_CHUNK;
+      data->crc32_data = cs_crc32(data->crc32_data,
+                                  (const uint8_t *)msg->body.p, msg->body.len);
       if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
         // Errored, maybe log?
         LOG(LL_WARN,
@@ -62,13 +65,25 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
       cn->flags |= MG_F_CLOSE_IMMEDIATELY;
       bool finalize = true;
       if (msg->body.len > 0) {
+        data->crc32_data = cs_crc32(
+            data->crc32_data, (const uint8_t *)msg->body.p, msg->body.len);
         if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
           finalize = false;
         }
       }
 
+      if (data->crc32_data != data->crc32) {
+        LOG(LL_WARN, ("Wrong crc for update, expected 0x%x, got 0x%x",
+                      data->crc32, data->crc32_data));
+        data->context->status_msg = "Invalid CRC";
+        data->context->result = 0;
+        finalize = false;
+      }
+
       if (finalize) {
         updater_finalize(data->context);
+      } else {
+        updater_finish(data->context);
       }
 
       free(data);
