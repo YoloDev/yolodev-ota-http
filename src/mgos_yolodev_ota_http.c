@@ -82,10 +82,12 @@ static void yolodev_ota_request_ev(int ev, void *ev_data, void *userdata) {
   LOG(LL_DEBUG, ("New OTA request: %s", data->uri));
   if (data->handled) {
     LOG(LL_DEBUG, ("Request is already handled, skipping: %s", data->uri));
+    return;
   }
 
   if (!is_http_request(data->uri)) {
     LOG(LL_DEBUG, ("Request is not a HTTP request, skipping: %s", data->uri));
+    return;
   }
 
   LOG(LL_INFO, ("New HTTP OTA request, starting download: %s", data->uri));
