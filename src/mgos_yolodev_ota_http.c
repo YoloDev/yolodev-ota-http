@@ -75,9 +75,9 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
       if (data->crc32_data != data->crc32) {
         LOG(LL_WARN, ("Wrong crc for update, expected 0x%x, got 0x%x",
                       data->crc32, data->crc32_data));
-        data->context->status_msg = "Invalid CRC";
-        data->context->result = 0;
-        finalize = false;
+        // data->context->status_msg = "Invalid CRC";
+        // data->context->result = 0;
+        // finalize = false;
       }
 
       if (finalize) {
