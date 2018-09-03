@@ -80,6 +80,10 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
 static void yolodev_ota_request_ev(int ev, void *ev_data, void *userdata) {
   struct yolodev_ota_request *data = (struct yolodev_ota_request *)ev_data;
   LOG(LL_DEBUG, ("New OTA request: %s", data->uri));
+  if (data->handled) {
+    LOG(LL_DEBUG, ("Request is already handled, skipping: %s", data->uri));
+  }
+
   if (!is_http_request(data->uri)) {
     LOG(LL_DEBUG, ("Request is not a HTTP request, skipping: %s", data->uri));
   }
@@ -90,6 +94,7 @@ static void yolodev_ota_request_ev(int ev, void *ev_data, void *userdata) {
   request_data->crc32 = data->crc32;
   request_data->crc32_data = 0;
   request_data->context = data->updater_context;
+  data->handled = true;
 
   // struct mg_connect_opts opts;
   // memset(&opts, 0, sizeof(opts));
