@@ -45,16 +45,18 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
     case MG_EV_HTTP_CHUNK: {
       struct http_message *msg = (struct http_message *)ev_data;
       cn->flags |= MG_F_DELETE_CHUNK;
-      data->crc32_data = cs_crc32(data->crc32_data,
-                                  (const uint8_t *)msg->body.p, msg->body.len);
-      if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
-        // Errored, maybe log?
-        LOG(LL_WARN,
-            ("Failed in update_process: %s", data->context->status_msg));
-        cn->flags |= MG_F_CLOSE_IMMEDIATELY;
-        updater_finish(data->context);
-        free(data);
-        return;
+      if (msg->body.len > 0) {
+        data->crc32_data = cs_crc32(
+            data->crc32_data, (const uint8_t *)msg->body.p, msg->body.len);
+        if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
+          // Errored, maybe log?
+          LOG(LL_WARN,
+              ("Failed in update_process: %s", data->context->status_msg));
+          cn->flags |= MG_F_CLOSE_IMMEDIATELY;
+          updater_finish(data->context);
+          free(data);
+          return;
+        }
       }
 
       break;
