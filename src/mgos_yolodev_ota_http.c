@@ -66,7 +66,6 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
     }
 
     case MG_EV_HTTP_REPLY: {
-      struct http_message *msg = (struct http_message *)ev_data;
       cn->flags |= MG_F_CLOSE_IMMEDIATELY | MG_F_DELETE_CHUNK;
       LOG(LL_DEBUG, ("Received response end"));
       break;
