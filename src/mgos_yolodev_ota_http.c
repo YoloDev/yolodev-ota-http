@@ -36,6 +36,7 @@ struct update_request_data {
 static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
                     void *user_data) {
   if (user_data == NULL) {
+    LOG(LL_DEBUG, ("user_data == null"));
     return;
   }
 
@@ -45,16 +46,18 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
     case MG_EV_HTTP_CHUNK: {
       struct http_message *msg = (struct http_message *)ev_data;
       cn->flags |= MG_F_DELETE_CHUNK;
+      LOG(LL_DEBUG, ("Received chunk, length: %d", msg->body.len));
       if (msg->body.len > 0) {
+        LOG(LL_DEBUG, ("CRC data before: %x", data->crc32_data));
         data->crc32_data = cs_crc32(
             data->crc32_data, (const uint8_t *)msg->body.p, msg->body.len);
+        LOG(LL_DEBUG, ("CRC data after: %x", data->crc32_data));
+
         if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
           // Errored, maybe log?
           LOG(LL_WARN,
               ("Failed in update_process: %s", data->context->status_msg));
           cn->flags |= MG_F_CLOSE_IMMEDIATELY;
-          updater_finish(data->context);
-          free(data);
           return;
         }
       }
@@ -64,16 +67,24 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
 
     case MG_EV_HTTP_REPLY: {
       struct http_message *msg = (struct http_message *)ev_data;
-      cn->flags |= MG_F_CLOSE_IMMEDIATELY;
-      bool finalize = true;
+      cn->flags |= MG_F_CLOSE_IMMEDIATELY | MG_F_DELETE_CHUNK;
+      LOG(LL_DEBUG, ("Received response end, length: %d", msg->body.len));
+
       if (msg->body.len > 0) {
+        LOG(LL_DEBUG, ("CRC data before: %x", data->crc32_data));
         data->crc32_data = cs_crc32(
             data->crc32_data, (const uint8_t *)msg->body.p, msg->body.len);
+        LOG(LL_DEBUG, ("CRC data after: %x", data->crc32_data));
+
         if (updater_process(data->context, msg->body.p, msg->body.len) < 0) {
-          finalize = false;
+          LOG(LL_WARN,
+              ("Failed in update_process: %s", data->context->status_msg));
         }
       }
+    }
 
+    case MG_EV_CLOSE: {
+      LOG(LL_DEBUG, ("Connection close"));
       if (data->crc32_data != data->crc32) {
         LOG(LL_WARN, ("Wrong crc for update, expected 0x%x, got 0x%x",
                       data->crc32, data->crc32_data));
@@ -82,12 +93,16 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
         // finalize = false;
       }
 
-      if (finalize) {
+      // TODO: Test for error state
+      if (true) {
+        LOG(LL_DEBUG, ("updater_finalize"));
         updater_finalize(data->context);
       } else {
+        LOG(LL_DEBUG, ("updater_finish"));
         updater_finish(data->context);
       }
 
+      LOG(LL_DEBUG, ("free updater data"));
       free(data);
       break;
     }
