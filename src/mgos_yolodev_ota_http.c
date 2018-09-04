@@ -73,22 +73,18 @@ static void http_ev(struct mg_connection *cn, int ev, void *ev_data,
 
     case MG_EV_CLOSE: {
       LOG(LL_DEBUG, ("Connection close"));
-      // TODO: Also, only do this if state is successful
-      if (data->crc32_data != data->crc32) {
+      if (!is_update_finished(data->context) &&
+          data->crc32_data != data->crc32) {
         LOG(LL_WARN, ("Wrong crc for update, expected 0x%x, got 0x%x",
                       data->crc32, data->crc32_data));
-        // data->context->status_msg = "Invalid CRC";
-        // data->context->result = 0;
-        // finalize = false;
+        data->context->status_msg = "Invalid archive CRC";
+        data->context->result = -1;
+        updater_finish(data->context);
       }
 
-      // TODO: Test for error state
-      if (true) {
+      if (!is_update_finished(data->context)) {
         LOG(LL_DEBUG, ("updater_finalize"));
         updater_finalize(data->context);
-      } else {
-        LOG(LL_DEBUG, ("updater_finish"));
-        updater_finish(data->context);
       }
 
       LOG(LL_DEBUG, ("free updater data"));
@@ -123,7 +119,9 @@ static void yolodev_ota_request_ev(int ev, void *ev_data, void *userdata) {
   // memset(&opts, 0, sizeof(opts));
   // opts.user_data = request_data;
 
-  mg_connect_http(mgos_get_mgr(), http_ev, request_data, data->uri, NULL, NULL);
+  struct mg_connection *nc = mg_connect_http(
+      mgos_get_mgr(), http_ev, request_data, data->uri, NULL, NULL);
+  request_data->context->nc = nc;
 
   (void)ev;
   (void)userdata;
